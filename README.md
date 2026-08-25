@@ -46,10 +46,7 @@ src/__tests__/            # Unit tests (errors.test.ts) +
 
 ## Status
 
-This is a scaffold: server boots, schema is complete, and
-`createCollection` / `Query.collections` are fully implemented as a
-reference pattern. The remaining resolvers in `Query.ts` and
-`Mutation.ts` are marked `TODO` with implementation notes inline.
+## Manual verification All resolvers were exercised end-to-end via the GraphiQL playground against the Dockerized Postgres instance: - `createCollection` / `collections` — create + list round-trip confirmed - `createDocument` — succeeds with a valid `collectionId`; returns a clean `NOT_FOUND` error (not a 500) for a bogus one - `documents` — search, filters, and cursor pagination (`take` + `cursor` + `hasNextPage`/`endCursor`) all confirmed working - `updateDocument` — partial updates confirmed; `NOT_FOUND` on a missing id - `deleteDocument` — returns `true` on success, `false` (not an error) on a repeat delete of an already-removed document - `moveDocument` — confirmed moving a document between collections - `collection(id)` — returns the collection with nested documents; returns `null` (not an error) for a non-existent id, per the schema's nullability
 
 ## How I'd extend this
 
