@@ -32,43 +32,51 @@ The API is served at `http://localhost:4000/graphql`.
 
 ## Project structure
 
-```
-prisma/schema.prisma      # Collection + Document models
-src/schema.graphql        # GraphQL SDL (schema-first)
-src/resolvers/            # Query, Mutation, and nested-field resolvers
-src/context.ts            # Per-request GraphQL context (exposes prisma)
-src/errors.ts             # Validation helpers + typed GraphQLError throwers
-src/db.ts                 # Prisma client singleton
-src/index.ts              # Yoga server entrypoint
-src/__tests__/            # Unit tests (errors.test.ts) +
-                           # integration test against Dockerized Postgres
-```
 
 ## Status
 
-This is a scaffold: server boots, schema is complete, and
-`createCollection` / `Query.collections` are fully implemented as a
-reference pattern. The remaining resolvers in `Query.ts` and
-`Mutation.ts` are marked `TODO` with implementation notes inline.
+All required resolvers are implemented: `createCollection`, `collections`,
+`collection(id)` (with nested documents, returns `null` if not found),
+`documents` (search + filters + cursor pagination), `createDocument`,
+`updateDocument` (partial updates), `deleteDocument` (idempotent —
+returns `false` rather than erroring on a repeat delete), and
+`moveDocument`. `bun run sanity` (lint + typecheck + test) passes clean.
+
+## Manual verification
+
+All resolvers were exercised end-to-end via the GraphiQL playground
+against the Dockerized Postgres instance:
+
+- `createCollection` / `collections` — create + list round-trip confirmed
+- `createDocument` — succeeds with a valid `collectionId`; returns a
+  clean `NOT_FOUND` error (not a 500) for a bogus one
+- `documents` — search, filters, and cursor pagination (`take` +
+  `cursor` + `hasNextPage`/`endCursor`) all confirmed working
+- `updateDocument` — partial updates confirmed; `NOT_FOUND` on a
+  missing id
+- `deleteDocument` — returns `true` on success, `false` (not an error)
+  on a repeat delete of an already-removed document
+- `moveDocument` — confirmed moving a document between collections
+- `collection(id)` — returns the collection with nested documents;
+  returns `null` (not an error) for a non-existent id, per the
+  schema's nullability
 
 ## How I'd extend this
 
 If this grew beyond the assignment scope, I'd add:
 
 - **Auth & RBAC** — every mutation is currently unauthenticated by design
-  (explicitly out of scope). I'd add a JWT-based context that resolves
-  the current user, then scope collections/documents to their owner or
-  team.
-- **Backward pagination** — `documents` currently only supports
-  forward paging (`take` + `cursor` + `hasNextPage`/`endCursor`). Adding
+  (explicitly out of scope for this assignment). I'd add a JWT-based
+  context that resolves the current user, then scope collections and
+  documents to their owner or team.
+- **Backward pagination** — `documents` currently only supports forward
+  paging (`take` + `cursor` + `hasNextPage`/`endCursor`). Adding
   `last`/`before` with `hasPreviousPage`/`startCursor` would make it
   fully Relay-spec-compliant.
 - **Caching hot reads** — `collections` and `collection(id)` are simple
-  reads that rarely change; a short-TTL Redis cache in front of them
-  would cut DB load without much complexity, once there's real traffic
-  to justify it.
+  reads that rarely change; a short-TTL cache in front of them would
+  cut database load once there's real traffic to justify it.
 - **Full-text search** — the current `search` argument does a simple
-  `contains`/`insensitive` substring match. Postgres's built-in
-  `tsvector`/`tsquery` (or an external index like Meilisearch) would
-  scale better and support ranking/relevance as the document count
-  grows.
+  case-insensitive substring match. Postgres's `tsvector`/`tsquery`
+  (or an external index) would scale better and support relevance
+  ranking as the document count grows.
